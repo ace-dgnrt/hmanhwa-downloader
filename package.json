@@ -10,7 +10,9 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "Jsock": "git+https://github.com/ncpa0cpl/Jsock.git",
     "adm-zip": "^0.5.4",
+    "chalk": "^4.1.1",
     "concat-stream": "^1.6.2",
     "md5": "^2.3.0",
     "node-fetch": "^2.6.1",
@@ -30,6 +32,9 @@
     "@types/md5": "^2.3.0",
     "@types/node": "^14.14.34",
     "@types/node-fetch": "^2.5.8",
-    "@types/promise-fs": "^2.1.1"
+    "@types/promise-fs": "^2.1.1",
+    "@typescript-eslint/eslint-plugin": "^4.23.0",
+    "@typescript-eslint/parser": "^4.23.0",
+    "eslint": "^7.26.0"
   }
 }

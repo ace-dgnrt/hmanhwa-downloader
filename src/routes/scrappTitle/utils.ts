@@ -1,14 +1,11 @@
-import fetch from "node-fetch";
+import HTMLParser from "node-html-parser";
+import path from "path";
 import { Methods } from "../../API/types";
 import { getCurrentHoster } from "../../scrapHoster";
-import HTMLParser from "node-html-parser";
-import { fetchChapter } from "../scrappChapter/utils";
-import path from "path";
-import {
-  Chapter,
-  getChapterController,
-} from "../../scrapHoster/ChapterController/ChapterController";
+import type { Chapter } from "../../scrapHoster/ChapterController/ChapterController";
+import { getChapterController } from "../../scrapHoster/ChapterController/ChapterController";
 import { fetchRetry } from "../../utils/images";
+import { Logger } from "../../utils/Logger";
 
 type ImageList = Array<
   Array<{
@@ -16,6 +13,8 @@ type ImageList = Array<
     name: string;
   }>
 >;
+
+type HTMLElement = ReturnType<typeof HTMLParser>;
 
 function isNumerical(name: string) {
   const basename = path.basename(name);
@@ -60,6 +59,31 @@ function generateNewNames(images: ImageList) {
   }
 }
 
+function sortChapters(chapters: HTMLAnchorElement[]) {
+  chapters.sort((a, b) => {
+    const aTitle = a.innerText;
+    const bTitle = b.innerText;
+
+    const aNumber = Number(aTitle.replace(/[^0-9]/g, ""));
+    const bNumber = Number(bTitle.replace(/[^0-9]/g, ""));
+
+    if (aNumber > bNumber) return 1;
+    else if (aNumber < bNumber) return -1;
+    return 0;
+  });
+}
+
+function getTitle(doc: HTMLElement) {
+  const breadcrumbs = doc.querySelectorAll("ol.breadcrumb > li");
+  if (breadcrumbs.length === 0) return "";
+  const lastBreadcrumb = breadcrumbs[breadcrumbs.length - 1];
+  const anchor = lastBreadcrumb.querySelector("a");
+  if (!anchor) return "";
+  const text = anchor.innerText;
+  const title = text.replace(/[^0-9a-zA-Z,.?!':]/g, "");
+  return title;
+}
+
 export async function fetchTitle(url: string) {
   const chapterController = getChapterController();
   const rawHtml = await fetchRetry(url, { method: Methods.GET }).then((data) =>
@@ -72,40 +96,37 @@ export async function fetchTitle(url: string) {
     .querySelectorAll(".wp-manga-chapter > a")
     .reverse() as any;
 
-  const breadcrumbs = document.querySelectorAll("ol.breadcrumb > li");
-  const title =
-    breadcrumbs[breadcrumbs.length - 1].querySelector("a").innerText || "";
+  sortChapters(chaptersAnchors);
+
+  const title = getTitle(document);
 
   const imagesPromiseList: Promise<Chapter>[] = [];
 
+  const chapters: Chapter[] = [];
+  let i = 1;
   for (const anchor of chaptersAnchors) {
     const chapterUrl = anchor.getAttribute("href");
     if (!chapterUrl) continue;
-    // console.log("getting chapter ", chapterUrl);
 
     imagesPromiseList.push(
       new Promise(async (resolve, reject) => {
         try {
           const chapter = await (async () => {
-            // console.log("looking for chapter, ", chapterUrl);
-
             const c = chapterController.getChapter(chapterUrl);
             if (c) {
               return c;
             }
+
+            Logger.info(`  Fetching chapter ${chapterUrl}`);
             return await chapterController.addChapter(chapterUrl);
           })();
 
-          // console.log("got chapter instance, waiting for load end");
-
           chapter.onLoad((chapter) => {
-            // console.log("loaded");
-
+            Logger.info(`  Finished fetching chapter ${chapterUrl}`);
             if (chapter) {
               resolve(chapter);
             } else {
               reject();
-              // console.log("Rejecting load on " + chapterUrl);
             }
           });
         } catch (e) {
@@ -113,15 +134,24 @@ export async function fetchTitle(url: string) {
         }
       })
     );
+
+    if (i++ % 5 === 0) {
+      const r = await Promise.all(imagesPromiseList);
+      chapters.push(...r);
+      imagesPromiseList.splice(0, imagesPromiseList.length);
+    }
   }
 
-  const chapters = await Promise.all(imagesPromiseList);
+  const r = await Promise.all(imagesPromiseList);
+  chapters.push(...r);
 
-  let offset = 0;
-  for (const chap of chapters) {
-    const l = await chap.shiftNames(offset, 1);
-    offset += l;
-  }
+  // const chapters = await Promise.all(imagesPromiseList);
+
+  // let offset = 0;
+  // for (const chap of chapters) {
+  //   const l = await chap.shiftNames(offset, 1);
+  //   offset += l;
+  // }
 
   // const finalImageList = images.reduce((acc: ImageList[number], val) => {
   //   acc.push(...val);
@@ -139,7 +169,9 @@ export async function getTitleEntry(url: string) {
     return existingEntry;
   }
 
+  Logger.info(`Fetching chapters from ${url}`);
   const title = await fetchTitle(url);
+  Logger.info(`All chapters fetched from ${url}`);
 
   const entry = await hoster.addNewEntry(title.chapters, title.title, url);
 

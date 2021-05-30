@@ -1,4 +1,6 @@
-import fetch, { RequestInit, Response } from "node-fetch";
+import type { RequestInit, Response } from "node-fetch";
+import fetch from "node-fetch";
+import { Logger } from "./Logger";
 
 export function extractSrc(img: HTMLImageElement) {
   const srcAttribValue = img.getAttribute("src") || "";
@@ -20,7 +22,7 @@ function promiseWithTimeout<T>(callback: () => Promise<T>, ms?: number) {
   return new Promise<T>((resolve, reject) => {
     const timeout = setTimeout(() => {
       reject("Timeout");
-    }, 20 * 1000);
+    }, 25 * 1000);
     callback()
       .then(resolve)
       .catch(reject)
@@ -53,7 +55,7 @@ class FetchQueue {
   }
 
   processQueue() {
-    let toProcess: QueueEntry[] = [];
+    const toProcess: QueueEntry[] = [];
     while (true) {
       if (this.queue.length === 0) {
         break;
@@ -90,18 +92,20 @@ export function fetchRetry(url: string, options?: RequestInit) {
 export async function fr(
   url: string,
   options?: RequestInit,
-  retryOnError: boolean = true
+  retryCount = 0
 ): Promise<Response> {
   return new Promise<Response>((resolve, reject) => {
     fetch(url, options)
       .then(resolve)
       .catch((e) => {
-        if (retryOnError) {
+        if (retryCount < 10) {
           sleep(2000).then(() => {
-            fr(url, options, false).then(resolve).catch(reject);
+            fr(url, options, retryCount + 1)
+              .then(resolve)
+              .catch(reject);
           });
         } else {
-          console.error("Error fetching resources: " + url);
+          Logger.warning("Error fetching resources", { url });
           reject(e);
         }
       });

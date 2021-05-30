@@ -1,5 +1,5 @@
 import AdmZip from "adm-zip";
-import http from "http";
+import type http from "http";
 import md5 from "md5";
 import path from "path";
 import fs from "promise-fs";
@@ -9,9 +9,11 @@ import {
   ValidateField,
 } from "../API/RequestHanlder/RequestHandler";
 import { DataType } from "../API/RequestHanlder/types";
-import { HandlerFunc, ResponseCode, ValidatorFunc } from "../API/types";
-import { checkGetKeys } from "../utils/data";
-import { Chapter } from "./ChapterController/ChapterController";
+import { ResponseCode } from "../API/types";
+import type { FileFacade } from "../utils/FileFacade";
+import { Logger } from "../utils/Logger";
+import type { Chapter } from "./ChapterController/ChapterController";
+import { formatName } from "./ChapterController/ChapterController";
 import { downloadPathname } from "./urls";
 
 const PACKAGE_FILENAME = "package.zip";
@@ -58,13 +60,41 @@ async function removeFile(p: string) {
   return newPath;
 }
 
+function nameToNumber(name: string) {
+  const numericalString = name
+    .replace(/[^0-9.,]/g, "")
+    .replace(/^[.,]+/, "")
+    .replace(/[.,]+$/, "");
+  return Number(numericalString);
+}
+
+function sortChapters(chapters: Chapter[]) {
+  return chapters.sort((a, b) => {
+    const aNumber = nameToNumber(a.chapterName);
+    const bNumber = nameToNumber(b.chapterName);
+    if (aNumber > bNumber) return 1;
+    else if (aNumber < bNumber) return -1;
+    return 0;
+  });
+}
+
+function sortFiles(files: FileFacade[]) {
+  return files.sort((a, b) => {
+    const aNumber = nameToNumber(a.filename);
+    const bNumber = nameToNumber(b.filename);
+    if (aNumber > bNumber) return 1;
+    else if (aNumber < bNumber) return -1;
+    return 0;
+  });
+}
+
 export class HosterEntry {
   parent: Hoster;
   dirName: string;
   package: string;
   private isReady: boolean;
   private onReadyChange: Array<(success: boolean) => void> = [];
-  private name: string = "";
+  private name = "";
   constructor(parent: Hoster, dirName: string, name?: string, pack?: string) {
     this.parent = parent;
     this.dirName = dirName;
@@ -81,27 +111,42 @@ export class HosterEntry {
     return path.resolve(this.dirFullPath, this.package);
   }
   async createPackage(chapters: Chapter[]) {
+    Logger.info(`Creating archive for ${this.getName()}`);
     const zip = new AdmZip();
-    const files = chapters.reduce((acc: string[], val) => {
-      const flist = val.getFileList();
-      acc.push(...flist);
-      return acc;
-    }, []);
-    for (const f of files) {
-      zip.addLocalFile(f);
+    const chapterList = [...chapters];
+    sortChapters(chapterList);
+
+    let i = 1;
+    for (const chapter of chapterList) {
+      const files = [...chapter.getFileList()];
+      sortFiles(files);
+      for (const file of files) {
+        const newName = formatName(i++, file.ext);
+        zip.addLocalFile(file.fullPath, "", newName);
+      }
     }
+
+    // const files = chapterList.reduce((acc: FileFacade[], val) => {
+    //   const flist = val.getFileList();
+    //   acc.push(...flist);
+    //   return acc;
+    // }, []);
+    // for (const f of files) {
+    //   zip.addLocalFile(f.fullPath, "");
+    // }
     return new Promise<void>((resolve, reject) => {
       if (fs.existsSync(this.packagePath)) {
-        resolve();
         this.setReady(true);
+        resolve();
         return;
       }
       zip.writeZip(this.packagePath, (e) => {
+        Logger.info(`Archive created for ${this.getName()}`);
+        this.setReady(!e);
         if (e) {
           reject(e);
         }
         resolve();
-        this.setReady(!e);
       });
     });
   }
@@ -152,7 +197,7 @@ export class HosterEntry {
       response.setHeader(Header.ContentType, ContentType.ZIP);
       response.setHeader(
         Header.ContentDisposition,
-        `attachment; filename=${this.name || "package"}.zip`
+        `attachment; filename="${this.name || "package"}.zip"`
       );
       response.statusCode = ResponseCode.SUCCESS;
       return fs.createReadStream(packagePath);

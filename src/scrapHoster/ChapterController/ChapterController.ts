@@ -1,8 +1,12 @@
-import fs from "promise-fs";
 import path from "path";
-import { fetchChapter } from "../../routes/scrappChapter/utils";
-import { CHAPTERS_DIR } from "../conf";
+import fs from "promise-fs";
 import { getDirName } from "..";
+import { fetchChapter } from "../../routes/scrappChapter/utils";
+import type { FileFacade } from "../../utils/FileFacade";
+import { NewFileFacade } from "../../utils/FileFacade";
+import { createFile } from "../../utils/FileFacade/utils/createNewFile";
+import { Logger } from "../../utils/Logger";
+import { CHAPTERS_DIR } from "../conf";
 
 enum ChapterStatus {
   Uninitialized,
@@ -11,9 +15,9 @@ enum ChapterStatus {
   Deleted,
 }
 
-function formatName(n: number | string, ext: string) {
+export function formatName(n: number | string, ext: string) {
   const name = `${n}`;
-  return `${Array.from({ length: Math.max(0, 3 - name.length) }, () => 0).join(
+  return `${Array.from({ length: Math.max(0, 4 - name.length) }, () => 0).join(
     ""
   )}${name}${ext}`;
 }
@@ -22,10 +26,10 @@ function filename(p: string) {
   return path.basename(p, path.extname(p));
 }
 
-function sortNumPathnames(arr: string[]) {
+function sortNumPathnames(arr: FileFacade[]) {
   return arr.sort((a, b) => {
-    const numA = Number(filename(a));
-    const numB = Number(filename(b));
+    const numA = Number(a.filename);
+    const numB = Number(b.filename);
     if (numA > numB) {
       return 1;
     } else if (numB > numA) {
@@ -43,9 +47,9 @@ function isPathnameNumerical(name: string) {
   return isNumerical(filename(name));
 }
 
-function isEveryNameNumerical(images: string[]) {
+function isEveryNameNumerical(images: FileFacade[]) {
   return images.every((img) => {
-    return isPathnameNumerical(img);
+    return isNumerical(img.filename);
   });
 }
 
@@ -58,11 +62,11 @@ async function dirExists(path: string) {
 }
 
 export class Chapter {
-  chapterName: string = "";
-  private path: string = "";
-  private hashedUrl: string = "";
+  chapterName = "";
+  private path = "";
+  private hashedUrl = "";
   private status: ChapterStatus = ChapterStatus.Uninitialized;
-  private fileList: string[] = [];
+  private fileList: FileFacade[] = [];
 
   private subscribents: Array<(chapter: Chapter | undefined) => void> = [];
 
@@ -71,8 +75,7 @@ export class Chapter {
   }
 
   getFileList() {
-    const imgdir = this.imageDir;
-    return this.fileList.map((f) => path.join(imgdir, f));
+    return this.fileList;
   }
 
   private resolveSubscribents() {
@@ -90,33 +93,53 @@ export class Chapter {
     }
     this.status = ChapterStatus.Loading;
     const chapterData = await fetchChapter(url);
-    chapterData.images = chapterData.images.filter((v) =>
+
+    const numericalNamedImages = chapterData.images.filter((v) =>
       isPathnameNumerical(v.name)
+    );
+    console.assert(
+      numericalNamedImages.length === chapterData.images.length,
+      "Not all images have numerical names",
+      url
     );
     const dirpath = path.resolve(CHAPTERS_DIR, getDirName(url));
     const imgdir = path.resolve(dirpath, "images");
     if (fs.existsSync(dirpath)) {
+      Logger.warning("Chapter already exists!", { url });
       return;
     }
     await fs.mkdir(dirpath);
     await fs.mkdir(imgdir);
-    const queue: Promise<void>[] = [];
-    queue.push(
-      fs.writeFile(
-        path.resolve(dirpath, "info.json"),
-        JSON.stringify({ name: chapterData.chapterTitle }),
-        { encoding: "utf-8" }
-      )
+    const queue: Promise<FileFacade>[] = [];
+    await fs.writeFile(
+      path.resolve(dirpath, "info.json"),
+      JSON.stringify({
+        name: chapterData.chapterTitle,
+        files: numericalNamedImages.length,
+        url,
+      }),
+      { encoding: "utf-8" }
     );
-    for (const img of chapterData.images) {
-      const name = filename(img.name);
+    Logger.debug(
+      "Numerical Named Images",
+      numericalNamedImages.map((n) => n.name)
+    );
+
+    for (const img of numericalNamedImages) {
       const ext = path.extname(img.name);
-      const imagePath = path.resolve(imgdir, formatName(name, ext));
-      queue.push(fs.writeFile(imagePath, img.data));
-      this.fileList.push(img.name);
+      const name = formatName(filename(img.name), ext);
+      const imagePath = path.resolve(imgdir, name);
+      queue.push(createFile(img.data, imagePath));
     }
 
-    await Promise.all(queue);
+    await Promise.all(queue).then((files) => {
+      const ffacadList = files;
+      Logger.debug(
+        "File pushed to list",
+        ffacadList.map((f) => f.fullFilename)
+      );
+      this.fileList.push(...ffacadList);
+    });
 
     this.path = dirpath;
     this.chapterName = chapterData.chapterTitle;
@@ -143,7 +166,9 @@ export class Chapter {
           await fs.readFile(infopath, { encoding: "utf-8" })
         );
         this.chapterName = info.name;
-        this.fileList = await fs.readdir(imgdir);
+        this.fileList = await (await fs.readdir(imgdir)).map((file) =>
+          NewFileFacade(path.join(imgdir, file))
+        );
         this.status = ChapterStatus.Ready;
         this.resolveSubscribents();
       }
@@ -173,32 +198,33 @@ export class Chapter {
   }
 
   async shiftNames(offset: number, startFrom?: number) {
-    const files = sortNumPathnames([...this.fileList]);
-
-    if (!isEveryNameNumerical(files)) {
-      throw new Error("Invalid filenames");
-    }
-
-    if (startFrom === undefined) {
-      startFrom = Number(files[0]);
-    }
-
-    const newFileList: string[] = [];
-
-    let count = startFrom! + offset;
-    const queue: Promise<any>[] = [];
-
-    for (const f of files) {
-      const ext = path.extname(f);
-      const oldFPath = path.join(this.imageDir, f);
-      const fname = formatName(count++, ext);
-      const newFPath = path.join(this.imageDir, fname);
-      newFileList.push(fname);
-      queue.push(fs.rename(oldFPath, newFPath));
-    }
-    const nf = (await Promise.all(queue)).length;
-    this.fileList = newFileList;
-    return nf;
+    // const files = sortNumPathnames([...this.fileList]);
+    // Logger.debug(
+    //   "Shifting names",
+    //   files.map((f) => f.fullFilename)
+    // );
+    // if (!isEveryNameNumerical(files)) {
+    //   throw new Error("Invalid filenames");
+    // }
+    // if (startFrom === undefined) {
+    //   startFrom = Number(files[0].filename);
+    // }
+    // let count = startFrom! + offset;
+    // const queue: Array<() => Promise<void>> = [];
+    // for (const f of files) {
+    //   const newName = formatName(count++, f.ext);
+    //   queue.unshift(async () => {
+    //     await f.rename(newName);
+    //   });
+    // }
+    // for (const renameAction of queue) {
+    //   await renameAction();
+    // }
+    // // Logger.debug(
+    // //   "Shifting done",
+    // //   files.map((f) => f.fullFilename)
+    // // );
+    // return queue.length;
   }
 
   isUrl(url: string) {
@@ -262,6 +288,10 @@ class ChapterController {
   }
 
   async addChapter(url: string) {
+    const existingChap = this.savedChapters.find((c) => c.isUrl(url));
+    if (existingChap) {
+      return existingChap;
+    }
     const chapter = new Chapter();
     this.savedChapters.push(chapter);
     chapter.createNew(url);

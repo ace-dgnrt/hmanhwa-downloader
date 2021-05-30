@@ -1,13 +1,11 @@
-import { url } from "inspector";
-import fetch from "node-fetch";
 import HTMLParser from "node-html-parser";
+import path from "path";
 import { Methods } from "../../API/types";
 import { getCurrentHoster } from "../../scrapHoster";
-import {
-  Chapter,
-  getChapterController,
-} from "../../scrapHoster/ChapterController/ChapterController";
+import type { Chapter } from "../../scrapHoster/ChapterController/ChapterController";
+import { getChapterController } from "../../scrapHoster/ChapterController/ChapterController";
 import { extractSrc, fetchRetry } from "../../utils/images";
+import { Logger } from "../../utils/Logger";
 
 export async function fetchChapter(chapterUrl: string) {
   const rawHtml = await fetchRetry(chapterUrl, {
@@ -29,7 +27,8 @@ export async function fetchChapter(chapterUrl: string) {
 
   const imageList: Array<Promise<{ data: Buffer; name: string }>> = [];
 
-  for (const imageUrl of imagesSrc) {
+  for (const imageIndex in imagesSrc) {
+    const imageUrl = imagesSrc[imageIndex];
     imageList.push(
       new Promise(async (resolve, reject) => {
         try {
@@ -40,10 +39,10 @@ export async function fetchChapter(chapterUrl: string) {
           const name = urlParts[urlParts.length - 1];
           resolve({
             data: await data.buffer(),
-            name: name,
+            name: `${Number(imageIndex) + 1}${path.extname(name)}`,
           });
         } catch (e) {
-          console.error("error: ", e);
+          Logger.warning(e.message, e);
           reject(e);
         }
       })
@@ -51,6 +50,13 @@ export async function fetchChapter(chapterUrl: string) {
   }
 
   const results = await Promise.all(imageList);
+  console.assert(
+    results.length === imagesSrc.length,
+    "Not all images have been fetched",
+    results,
+    imagesSrc
+  );
+
   return { images: results, chapterTitle };
 }
 

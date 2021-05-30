@@ -1,15 +1,16 @@
-import http, { STATUS_CODES } from "http";
+import type http from "http";
+import qs from "querystring";
+import url from "url";
+import { Logger } from "../utils/Logger";
 import { ContentType, Header } from "./Headers";
-import {
+import type {
   ApiRoute,
   ApiRouteInterface,
   GetInterface,
   Methods,
   PostInterface,
-  ResponseCode,
 } from "./types";
-import url from "url";
-import qs from "querystring";
+import { ResponseCode } from "./types";
 
 const protocol: "http" | "https" = "http";
 
@@ -73,7 +74,7 @@ export default class Api {
 
       this.sendResponse(response, apiInterface, route);
     } catch (e) {
-      console.error(e);
+      Logger.warning(e.message, e);
       response.statusCode = ResponseCode.SERVER_ERROR;
       response.end();
     }
@@ -152,8 +153,8 @@ export default class Api {
 
   private parsePostRequestData(request: http.IncomingMessage) {
     return new Promise<PostInterface>((resolve, reject) => {
-      let buffer: any[] = [];
-      let size: number = 0;
+      const buffer: any[] = [];
+      let size = 0;
       request.on("data", (data) => {
         buffer.push(data);
         size += data.length;

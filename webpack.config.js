@@ -10,6 +10,7 @@ module.exports = (env, args) => {
       path: path.resolve(__dirname, "dist"),
       filename: "bundle.js",
       publicPath: "",
+      globalObject: "this",
     },
     resolve: {
       extensions: [".js", ".ts"],
@@ -22,6 +23,7 @@ module.exports = (env, args) => {
         },
       ],
     },
+    devtool: "eval-source-map",
     plugins: [
       new webpack.DefinePlugin({
         "process.ENV": JSON.stringify({

@@ -5,6 +5,7 @@ import {
 import { DataType } from "../../API/RequestHanlder/types";
 import { ResponseCode } from "../../API/types";
 import { constructDownloadUrl } from "../../scrapHoster";
+import { Logger } from "../../utils/Logger";
 import { getTitleEntry } from "./utils";
 
 const ScrapTitleValidators = {
@@ -33,7 +34,7 @@ export default RequestHandler()
       };
     } catch (e) {
       api.response.statusCode = ResponseCode.SERVER_ERROR;
-      console.error(e);
+      Logger.warning(e.message, e);
     }
     return {};
   });
