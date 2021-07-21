@@ -1,11 +1,13 @@
 import path from "path";
 import fs from "promise-fs";
 import { getDirName } from "..";
-import { fetchChapter } from "../../routes/scrappChapter/utils";
+import type { FetchChapterResult } from "../../routes/scrappChapter/workers/fetchChapterWorker";
+import { fetchChapter } from "../../routes/scrappChapter/workers/fetchChapterWorker";
 import type { FileFacade } from "../../utils/FileFacade";
 import { NewFileFacade } from "../../utils/FileFacade";
 import { createFile } from "../../utils/FileFacade/utils/createNewFile";
 import { Logger } from "../../utils/Logger";
+import { sleep } from "../../utils/sleep";
 import { CHAPTERS_DIR } from "../conf";
 
 enum ChapterStatus {
@@ -79,11 +81,15 @@ export class Chapter {
   }
 
   private resolveSubscribents() {
-    if (this.status === ChapterStatus.Ready && this.subscribents.length > 0) {
+    if (this.status === ChapterStatus.Ready) {
       while (this.subscribents.length > 0) {
         const sub = this.subscribents.shift()!;
         sub(this);
       }
+    } else {
+      throw new Error(
+        "Cannot resolve subscribents when the files are not ready."
+      );
     }
   }
 
@@ -92,16 +98,32 @@ export class Chapter {
       return;
     }
     this.status = ChapterStatus.Loading;
-    const chapterData = await fetchChapter(url);
+
+    let chapterData: FetchChapterResult;
+
+    let c = 0;
+    while (true) {
+      c++;
+      try {
+        chapterData = (await fetchChapter(url)) as FetchChapterResult;
+        break;
+      } catch (e) {
+        if (c > 15) {
+          throw new Error(`Unable to retrieve resource from url: [${url}]`);
+        }
+        await sleep(5000);
+        Logger.warning("Worker exited with error", e.message);
+      }
+    }
 
     const numericalNamedImages = chapterData.images.filter((v) =>
       isPathnameNumerical(v.name)
     );
-    console.assert(
-      numericalNamedImages.length === chapterData.images.length,
-      "Not all images have numerical names",
-      url
-    );
+    if (numericalNamedImages.length !== chapterData.images.length) {
+      Logger.warning("Not all images have numerical names", url);
+      throw new Error();
+    }
+
     const dirpath = path.resolve(CHAPTERS_DIR, getDirName(url));
     const imgdir = path.resolve(dirpath, "images");
     if (fs.existsSync(dirpath)) {
@@ -166,9 +188,9 @@ export class Chapter {
           await fs.readFile(infopath, { encoding: "utf-8" })
         );
         this.chapterName = info.name;
-        this.fileList = await (await fs.readdir(imgdir)).map((file) =>
-          NewFileFacade(path.join(imgdir, file))
-        );
+        this.fileList = await (
+          await fs.readdir(imgdir)
+        ).map((file) => NewFileFacade(path.join(imgdir, file)));
         this.status = ChapterStatus.Ready;
         this.resolveSubscribents();
       }

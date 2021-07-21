@@ -130,6 +130,7 @@ export async function fetchTitle(url: string) {
             }
           });
         } catch (e) {
+          Logger.warning(`Failed fetching a chapter`, e.message);
           reject(e);
         }
       })

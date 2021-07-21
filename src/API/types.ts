@@ -1,6 +1,5 @@
-import http from "http";
-import fs from "promise-fs";
-import { RequestHandler } from "./RequestHanlder/RequestHandler";
+import type http from "http";
+import type fs from "promise-fs";
 
 export enum Methods {
   GET = "GET",
