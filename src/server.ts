@@ -1,22 +1,17 @@
 import http from "http";
 import { isMainThread } from "worker_threads";
 import Api from "./API/api";
-import { registerRoutes as chapterRoutes } from "./routes/scrappChapter/urls";
-import { registerRoutes as titleRoutes } from "./routes/scrappTitle/urls";
-import { registerRoutes as hosterRoutes } from "./scrapHoster/urls";
-import { Logger } from "./utils/Logger";
+import { Logger } from "./Utils/Logger";
 
 declare const process: any;
+
+let API: Api;
 
 if (isMainThread) {
   const hostname = process.ENV.hostname;
   const port = process.ENV.port;
 
-  const api = new Api();
-
-  titleRoutes(api);
-  chapterRoutes(api);
-  hosterRoutes(api);
+  API = new Api();
 
   Logger.info("Starting new server");
 
@@ -28,8 +23,10 @@ if (isMainThread) {
       "Access-Control-Allow-Headers",
       request.headers.origin || "*"
     );
-    api.handleRequest(request, response);
+    API.handleRequest(request, response);
   });
 
   server.listen(port, hostname);
 }
+
+export { API };

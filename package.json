@@ -5,21 +5,27 @@
   "main": "index.js",
   "scripts": {
     "start": "NODE_ENV=development node --inspect ./dist/bundle.js",
-    "build": "webpack --mode development"
+    "build": "webpack --mode development",
+    "build:prod": "webpack --mode=production --node-env=production",
+    "test": "jest"
   },
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "Jsock": "git+https://github.com/ncpa0cpl/Jsock.git",
     "adm-zip": "^0.5.4",
+    "async-await-queue": "^1.2.0",
+    "axios": "^0.21.1",
     "chalk": "^4.1.1",
     "concat-stream": "^1.6.2",
+    "error-result": "github:ncpa0cpl/error-result",
+    "Jsock": "git+https://github.com/ncpa0cpl/Jsock.git",
     "md5": "^2.3.0",
     "node-fetch": "^2.6.1",
     "node-html-parser": "^3.0.4",
     "original-fs": "^1.1.0",
     "promise-fs": "^2.1.1",
     "querystring": "^0.2.1",
+    "rimraf": "^3.0.2",
     "ts-loader": "^8.0.18",
     "typescript": "^4.2.3",
     "webpack": "^5.25.0",
@@ -29,12 +35,17 @@
   "devDependencies": {
     "@types/adm-zip": "^0.4.33",
     "@types/concat-stream": "^1.6.0",
+    "@types/jest": "^26.0.24",
     "@types/md5": "^2.3.0",
     "@types/node": "^14.14.34",
     "@types/node-fetch": "^2.5.8",
     "@types/promise-fs": "^2.1.1",
+    "@types/rimraf": "^3.0.1",
     "@typescript-eslint/eslint-plugin": "^4.23.0",
     "@typescript-eslint/parser": "^4.23.0",
-    "eslint": "^7.26.0"
+    "eslint": "^7.26.0",
+    "jest": "^27.0.6",
+    "ts-jest": "^27.0.3",
+    "workerloader-jest-transformer": "^0.0.5"
   }
 }

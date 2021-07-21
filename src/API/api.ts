@@ -1,7 +1,7 @@
 import type http from "http";
 import qs from "querystring";
 import url from "url";
-import { Logger } from "../utils/Logger";
+import { Logger } from "../Utils/Logger";
 import { ContentType, Header } from "./Headers";
 import type {
   ApiRoute,

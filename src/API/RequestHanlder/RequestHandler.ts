@@ -1,11 +1,7 @@
-import {
-  ApiRouteInterface,
-  ResponseCode,
-  ResponseHandlerResult,
-} from "../types";
-import http from "http";
-import {
-  DataType,
+import type http from "http";
+import type { ApiRouteInterface, ResponseHandlerResult } from "../types";
+import { ResponseCode } from "../types";
+import type {
   FieldValidators,
   FilterDataTypes,
   GetUndefinedTypes,
@@ -13,6 +9,7 @@ import {
   Validator,
   ValidatorList,
 } from "./types";
+import { DataType } from "./types";
 
 function verifyFieldExistence(
   key: string,

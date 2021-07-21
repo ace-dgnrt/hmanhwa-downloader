@@ -1,5 +1,4 @@
 var path = require("path");
-const { web } = require("webpack");
 var webpack = require("webpack");
 
 module.exports = (env, args) => {
@@ -23,7 +22,6 @@ module.exports = (env, args) => {
         },
       ],
     },
-    devtool: "eval-source-map",
     plugins: [
       new webpack.DefinePlugin({
         "process.ENV": JSON.stringify({
