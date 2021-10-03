@@ -1,17 +1,21 @@
-import type { AxiosRequestConfig } from "axios";
-import { Worker } from "worker_threads";
-import type { WorkerMessage } from "../WorkersMessages";
-import { waitForWorkerMessage } from "../WorkersMessages";
+import type { AxiosRequestConfig, AxiosResponse } from "axios";
 
-export type DownloadWorkerMessage = WorkerMessage<string>;
+import { PromiseWT } from "@Utils/PromiseWithTimeout";
+import { downloader } from "@Workers/DownloadWorker/DownloadWorker";
 
 export function startDownloadWorker<T = void>(
   url: string,
   config: AxiosRequestConfig = {}
 ) {
-  const w = new Worker(new URL("./DownloadWorker.ts", import.meta.url), {
-    workerData: { url, config },
-  });
+  return PromiseWT<AxiosResponse<T>>(30000, (resolve, reject) => {
+    const downloaderInstance = downloader.spawn();
 
-  return waitForWorkerMessage<T>(w);
+    downloaderInstance
+      .download(url, config)
+      .then((r) => {
+        if (r.error) reject(r.error);
+        else resolve(r.data as AxiosResponse<T>);
+      })
+      .catch(reject);
+  });
 }

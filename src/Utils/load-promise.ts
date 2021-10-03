@@ -1,6 +1,13 @@
+import type { Result } from "error-result";
 import { ResultingPromise } from "error-result";
 
-export function createLoadPromise() {
+export type LoadPromise = {
+  resolve: () => void;
+  reject: (e: string | Error) => void;
+  promise: Promise<Result<void>>;
+};
+
+export function createLoadPromise(): LoadPromise {
   let resolve: () => void = () => {
     throw new Error("resolve() method has not been initialized yet.");
   };

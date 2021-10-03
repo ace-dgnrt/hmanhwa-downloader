@@ -1,7 +1,7 @@
 import { ResultingPromise } from "error-result";
-import type { Worker } from "worker_threads";
 import { parentPort } from "worker_threads";
 
+import type { Worker } from "worker_threads";
 export type WorkerMessage<T = void> =
   | {
       event: "message";

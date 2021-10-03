@@ -1,3 +1,4 @@
+import type { Result } from "error-result";
 import type http from "http";
 import type fs from "promise-fs";
 
@@ -71,6 +72,6 @@ export type ValidatorFunc = (
 
 export interface ApiRoute {
   urlPattern: string;
-  handler: (api: ApiRouteInterface) => Promise<ResponseHandlerResult>;
+  handler: (api: ApiRouteInterface) => Promise<Result<ResponseHandlerResult>>;
   methods: Methods[];
 }

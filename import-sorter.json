@@ -1,0 +1,36 @@
+{
+  "importSorter.generalConfiguration.sortOnBeforeSave": true,
+  "importSorter.sortConfiguration.customOrderingRules.rules": [
+    {
+      "type": "importMember",
+      "regex": "^$",
+      "orderLevel": 10,
+      "disableSort": true
+    },
+    {
+      "regex": "^[a-zA-Z0-9]",
+      "orderLevel": 20
+    },
+    {
+      "regex": "^[@]",
+      "orderLevel": 30
+    },
+    {
+      "regex": "^.{2}/",
+      "orderLevel": 40
+    },
+    {
+      "regex": "^.{1}/",
+      "orderLevel": 50
+    }
+  ],
+  "importStringConfiguration": {
+    "tabSize": 2,
+    "trailingComma": "multiline"
+  },
+  "importSorter.importStringConfiguration.numberOfEmptyLinesAfterAllImports": 1,
+  "importSorter.importStringConfiguration.quoteMark": "double",
+  "importSorter.sortConfiguration.customOrderingRules.defaultNumberOfEmptyLinesAfterGroup": 1,
+  "importSorter.sortConfiguration.customOrderingRules.defaultOrderLevel": 100,
+  "importSorter.sortConfiguration.removeUnusedImports": true
+}

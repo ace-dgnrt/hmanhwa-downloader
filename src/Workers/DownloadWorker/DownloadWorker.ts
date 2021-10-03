@@ -1,33 +1,27 @@
+import type { AxiosRequestConfig } from "axios";
 import axios from "axios";
-import { isMainThread, workerData } from "worker_threads";
-import { repackPromise } from "../../Utils/repack-promise";
-import { postWorkerMessage } from "../WorkersMessages";
+import { error } from "error-result";
+import { WorkerBridge } from "node-worker-bridge";
+import { Worker } from "worker_threads";
 
-async function main() {
-  if (!isMainThread) {
-    const url = workerData.url;
-    const config = workerData.config ?? {};
+import { repackPromise } from "@Utils/repack-promise";
+import { stripMethods } from "@Utils/StrinpMethods";
 
-    if (!url)
-      return postWorkerMessage({
-        event: "error",
-        data: "Missing url parameter",
-      });
+export const downloader = WorkerBridge(
+  { file: () => new Worker(new URL("./DownloadWorker.ts", import.meta.url)) },
+  () => {
+    const download = async <T>(url: string, config: AxiosRequestConfig) => {
+      try {
+        const result = await repackPromise(axios.get<T>(url, config));
 
-    const result = await repackPromise(axios.get(url, config));
+        const strippedResult = stripMethods(result);
 
-    if (result.error) {
-      return postWorkerMessage({
-        event: "error",
-        data: result.error,
-      });
-    }
+        return strippedResult;
+      } catch (e) {
+        return error(e as Error);
+      }
+    };
 
-    return postWorkerMessage({
-      event: "message",
-      data: result.data.data,
-    });
+    return { download };
   }
-}
-
-main();
+);

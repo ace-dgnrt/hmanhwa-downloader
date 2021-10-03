@@ -1,13 +1,16 @@
 import { error, result } from "error-result";
 import HTMLParser from "node-html-parser";
-import { extractSrc } from "../../../Utils/images";
-import { startDownloadWorker } from "../../../Workers/DownloadWorker/StartDownloadWorker";
-import { addDownloadToQueue } from "./DownloadQueue";
 
-export async function downloadResourceInfo(url: string) {
-  const htmlResults = await addDownloadToQueue(() =>
-    startDownloadWorker<string>(url)
-  );
+import {
+  retrieveTitleAndChapter,
+} from "@Routines/DownloadResource/Helpers/RetrieveTitleAndChapter";
+import { extractSrc } from "@Utils/images";
+import { startScrapperWorker } from "@Workers/SPAScrapper.ts/StartScrapperWorker";
+
+export async function downloadResourceInfo(url: string, index: number) {
+  const htmlResults = await startScrapperWorker(url, {
+    selectorToWait: "#wp-manga-current-chap",
+  });
 
   if (htmlResults.error) {
     return error(htmlResults.error);
@@ -19,15 +22,15 @@ export async function downloadResourceInfo(url: string) {
 
   const document = HTMLParser(htmlResults.data);
 
-  const chapterTitle =
-    document.querySelector("#chapter-heading")?.innerText || "";
+  const chapter = retrieveTitleAndChapter(document);
 
   const images = document.querySelectorAll(
     "img.wp-manga-chapter-img"
   ) as any as HTMLImageElement[];
 
   return result({
-    title: chapterTitle,
+    title: chapter.title,
+    number: chapter.number ?? index + 1,
     images: images
       .reverse()
       .map(extractSrc)

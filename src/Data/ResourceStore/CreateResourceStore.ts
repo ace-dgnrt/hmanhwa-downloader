@@ -1,11 +1,18 @@
 import { Unit, useProperty } from "Jsock";
-import type { Resource } from "./types";
 
+import { Logger } from "@Utils/Logger";
+
+import type { Resource } from "@Data/ResourceStore/types";
 export const createResourceStore = Unit(() => {
-  const [resources, setResources] = useProperty<Resource[]>([]);
+  const resources = useProperty<Resource[]>([]);
 
   const addResource = (r: Resource) => {
-    setResources((oldResources) => {
+    if (r.url.length === 0) {
+      Logger.error("Invalid Resource!", r);
+      return;
+    }
+
+    resources.set((oldResources) => {
       if (oldResources.find((elem) => elem.hash === r.hash))
         return oldResources;
       return [...oldResources, r];
@@ -13,20 +20,25 @@ export const createResourceStore = Unit(() => {
   };
 
   const deleteResource = (resourceHash: string) => {
-    setResources((oldResources) => {
+    resources.set((oldResources) => {
       if (oldResources.find((elem) => elem.hash === resourceHash))
         return oldResources.filter((elem) => elem.hash !== resourceHash);
       return oldResources;
     });
   };
 
-  const findResource = (resourceHash: string) =>
-    resources.find((elem) => elem.hash === resourceHash);
+  const clear = () => {
+    resources.set([]);
+  };
+
+  const findResource = (resourceHash: string): Resource | undefined =>
+    resources.get().find((elem) => elem.hash === resourceHash);
 
   return {
-    resources,
+    resources: resources.get(),
     addResource,
     deleteResource,
     findResource,
+    clear,
   };
 });

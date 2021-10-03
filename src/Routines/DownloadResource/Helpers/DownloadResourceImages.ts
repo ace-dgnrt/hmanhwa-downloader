@@ -1,10 +1,16 @@
+import axios from "axios";
 import { error, result } from "error-result";
-import { startDownloadWorker } from "../../../Workers/DownloadWorker/StartDownloadWorker";
-import { addDownloadToQueue } from "./DownloadQueue";
+
+import { addDownloadToQueue } from "@Utils/DownloadQueue";
+import { repackPromise } from "@Utils/repack-promise";
 
 async function downloadImage(src: string) {
   const image = await addDownloadToQueue(() =>
-    startDownloadWorker<ArrayBuffer>(src, { responseType: "arraybuffer" })
+    repackPromise(
+      axios
+        .get<ArrayBuffer>(src, { responseType: "arraybuffer" })
+        .then((r) => r.data)
+    )
   );
 
   if (image.error) {

@@ -1,7 +1,10 @@
 import http from "http";
 import { isMainThread } from "worker_threads";
-import Api from "./API/api";
-import { Logger } from "./Utils/Logger";
+
+import Api from "@Api/api";
+import { initiateEndpoints } from "@Endpoints/InitiateEndpoints";
+import { initiateStores } from "@Routines/InitiateStores/InitiateStores";
+import { Logger } from "@Utils/Logger";
 
 declare const process: any;
 
@@ -21,12 +24,16 @@ if (isMainThread) {
     response.setHeader("Access-Control-Allow-Methods", "OPTIONS, GET");
     response.setHeader(
       "Access-Control-Allow-Headers",
-      request.headers.origin || "*"
+      request.headers.origin ?? "*"
     );
     API.handleRequest(request, response);
   });
 
+  initiateStores();
+
+  initiateEndpoints(API);
+
+  Logger.info(`Listening on address [${hostname}:${port}]`);
+
   server.listen(port, hostname);
 }
-
-export { API };

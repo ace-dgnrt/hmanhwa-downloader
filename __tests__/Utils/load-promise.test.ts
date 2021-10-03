@@ -1,5 +1,5 @@
-import { sleep } from "../../src/Utils/images";
-import { createLoadPromise } from "../../src/Utils/load-promise";
+import { sleep } from "@Utils/images";
+import { createLoadPromise } from "@Utils/load-promise";
 
 describe("createLoadPromise()", () => {
   it("correctly resolves", async () => {

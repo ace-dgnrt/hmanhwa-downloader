@@ -1,14 +1,15 @@
 import { error, result } from "error-result";
 import path from "path";
-import { RESOURCE_DIR } from "../../../Data/Constants";
-import type { FileFacade } from "../../../Utils/FileFacade";
-import { createFile } from "../../../Utils/FileFacade/utils/CreateNewFile";
-import { readDir } from "../../../Utils/FileFacade/utils/ReadDir";
-import { checkIfFileExists } from "../../../Utils/fs/CheckIfFileExists";
-import { createDirIfNotExists } from "../../../Utils/fs/CreateDirIfNotExists";
-import { deleteDir } from "../../../Utils/fs/DeleteDir";
-import { Logger } from "../../../Utils/Logger";
 
+import { RESOURCE_DIR } from "@Data/Constants";
+import { createFile } from "@Hooks/FileFacade/utils/CreateNewFile";
+import { readDir } from "@Hooks/FileFacade/utils/ReadDir";
+import { checkIfFileExists } from "@Utils/fs/CheckIfFileExists";
+import { createDirIfNotExists } from "@Utils/fs/CreateDirIfNotExists";
+import { deleteDir } from "@Utils/fs/DeleteDir";
+import { Logger } from "@Utils/Logger";
+
+import type { FileFacade } from "@Hooks/FileFacade";
 function sortFileFacades(files: FileFacade[]): FileFacade[] {
   return [...files].sort((a, b) => {
     const aSymbol = Number(a.filename.replace(/[^0-9]/g, "")) ?? 0;
@@ -35,43 +36,42 @@ async function saveImage(
 
 export async function saveImagesToDisk(
   images: { data: ArrayBuffer; extension: string }[],
-  associatedHash: string
+  hash: string
 ) {
+  const targetDir = path.resolve(RESOURCE_DIR, hash);
   const mkResDir = await createDirIfNotExists(RESOURCE_DIR);
 
   if (mkResDir.error) return error(mkResDir.error);
 
-  const hashDir = path.resolve(RESOURCE_DIR, associatedHash);
-
-  const hashDirExists = await checkIfFileExists(hashDir);
+  const hashDirExists = await checkIfFileExists(targetDir);
 
   if (hashDirExists.data === true) {
-    const files = await readDir(hashDir);
+    const files = await readDir(targetDir);
     if (files.error) return error(files.error);
     if (files.data.length !== images.length)
       return error(
         new Error(
-          `Directory of name [${hashDir}] already exists, and it's contents do not match the remote.`
+          `Directory of name [${targetDir}] already exists, and it's contents do not match the remote.`
         )
       );
     return result(sortFileFacades(files.data));
   }
 
-  const mkHashDir = await createDirIfNotExists(hashDir);
+  const mkHashDir = await createDirIfNotExists(targetDir);
 
   if (mkHashDir.error) return error(mkHashDir.error);
 
   const files = await Promise.all(
     images.map((img, index) =>
-      saveImage(img.data, img.extension, hashDir, index)
+      saveImage(img.data, img.extension, targetDir, index)
     )
   );
 
   for (const f of files) {
     if (f.error) {
-      const deletion = await deleteDir(hashDir);
+      const deletion = await deleteDir(targetDir);
       if (deletion.error) {
-        Logger.warning(`Unable to remove directory [${hashDir}].`);
+        Logger.warning(`Unable to remove directory [${targetDir}].`);
       }
       return error(f.error);
     }

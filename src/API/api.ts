@@ -1,16 +1,18 @@
-import type http from "http";
 import qs from "querystring";
 import url from "url";
-import { Logger } from "../Utils/Logger";
-import { ContentType, Header } from "./Headers";
+
+import { ContentType, Header } from "@Api/Headers";
+import { ResponseCode } from "@Api/types";
+import { Logger } from "@Utils/Logger";
+
+import type http from "http";
 import type {
   ApiRoute,
   ApiRouteInterface,
   GetInterface,
   Methods,
   PostInterface,
-} from "./types";
-import { ResponseCode } from "./types";
+} from "@Api/types";
 
 const protocol: "http" | "https" = "http";
 
@@ -74,7 +76,7 @@ export default class Api {
 
       this.sendResponse(response, apiInterface, route);
     } catch (e) {
-      Logger.warning(e.message, e);
+      Logger.warning((e as Error).message, e);
       response.statusCode = ResponseCode.SERVER_ERROR;
       response.end();
     }
@@ -122,11 +124,19 @@ export default class Api {
     route: ApiRoute
   ) {
     const handlerResult = await route.handler(apiInterface);
+
+    if (handlerResult.error) {
+      Logger.error(handlerResult.error.message, handlerResult.error.stack);
+      response.statusCode = ResponseCode.BAD_REQUEST;
+      response.end();
+      return;
+    }
+
     response.statusCode = ResponseCode.SUCCESS;
-    if (handlerResult.options?.isStream && !!handlerResult.stream) {
-      handlerResult.stream.pipe(response);
+    if (handlerResult.data.options?.isStream && !!handlerResult.data.stream) {
+      handlerResult.data.stream.pipe(response);
     } else {
-      response.end(JSON.stringify(handlerResult.responseData || {}));
+      response.end(JSON.stringify(handlerResult.data.responseData ?? {}));
     }
   }
 
